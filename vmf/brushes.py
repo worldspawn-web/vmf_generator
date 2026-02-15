@@ -27,6 +27,8 @@ class Side:
         plane: List[Vertex],
         material: str = "TOOLS/TOOLSNODRAW",
         vertices: List[Vertex] = None,
+        uaxis: str = None,
+        vaxis: str = None,
     ):
         self.id = id
         self.plane = plane  # 3 points, defining the plane
@@ -34,8 +36,8 @@ class Side:
             vertices if vertices else plane
         )  # All vertices of the face (usually 4)
         self.material = material
-        self.uaxis = "[1 0 0 0] 0.25"
-        self.vaxis = "[0 -1 0 0] 0.25"
+        self.uaxis = uaxis if uaxis else "[1 0 0 0] 0.25"
+        self.vaxis = vaxis if vaxis else "[0 -1 0 0] 0.25"
         self.rotation = 0
         self.lightmapscale = 16
         self.smoothing_groups = 0
@@ -90,7 +92,7 @@ class Solid:
 
         side_id = self.id * 10
 
-        # 6 sides of the cube
+        # 6 sides of the cube - all with same texture and proper alignment
         # Top (players walk on this side) - Z max
         self.sides.append(
             Side(
@@ -100,13 +102,15 @@ class Solid:
                     Vertex(x_max, y_max, z_max),
                     Vertex(x_max, y_min, z_max),
                 ],
-                "DEV/DEV_MEASUREGENERIC01B",  # Видимая текстура
+                "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_min, y_max, z_max),
                     Vertex(x_max, y_max, z_max),
                     Vertex(x_max, y_min, z_max),
                     Vertex(x_min, y_min, z_max),
                 ],
+                "[1 0 0 0] 0.25",
+                "[0 -1 0 0] 0.25",
             )
         )
 
@@ -119,13 +123,15 @@ class Solid:
                     Vertex(x_max, y_min, z_min),
                     Vertex(x_max, y_max, z_min),
                 ],
-                "TOOLS/TOOLSNODRAW",
+                "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_min, y_min, z_min),
                     Vertex(x_max, y_min, z_min),
                     Vertex(x_max, y_max, z_min),
                     Vertex(x_min, y_max, z_min),
                 ],
+                "[1 0 0 0] 0.25",
+                "[0 -1 0 0] 0.25",
             )
         )
 
@@ -138,13 +144,15 @@ class Solid:
                     Vertex(x_min, y_max, z_min),
                     Vertex(x_max, y_max, z_min),
                 ],
-                "TOOLS/TOOLSNODRAW",
+                "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_min, y_max, z_max),
                     Vertex(x_min, y_max, z_min),
                     Vertex(x_max, y_max, z_min),
                     Vertex(x_max, y_max, z_max),
                 ],
+                "[1 0 0 0] 0.25",
+                "[0 0 -1 0] 0.25",
             )
         )
 
@@ -157,13 +165,15 @@ class Solid:
                     Vertex(x_max, y_min, z_min),
                     Vertex(x_min, y_min, z_min),
                 ],
-                "TOOLS/TOOLSNODRAW",
+                "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_max, y_min, z_max),
                     Vertex(x_max, y_min, z_min),
                     Vertex(x_min, y_min, z_min),
                     Vertex(x_min, y_min, z_max),
                 ],
+                "[1 0 0 0] 0.25",
+                "[0 0 -1 0] 0.25",
             )
         )
 
@@ -176,13 +186,15 @@ class Solid:
                     Vertex(x_max, y_min, z_max),
                     Vertex(x_max, y_min, z_min),
                 ],
-                "TOOLS/TOOLSNODRAW",
+                "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_max, y_max, z_max),
                     Vertex(x_max, y_min, z_max),
                     Vertex(x_max, y_min, z_min),
                     Vertex(x_max, y_max, z_min),
                 ],
+                "[0 1 0 0] 0.25",
+                "[0 0 -1 0] 0.25",
             )
         )
 
@@ -195,13 +207,15 @@ class Solid:
                     Vertex(x_min, y_max, z_max),
                     Vertex(x_min, y_max, z_min),
                 ],
-                "TOOLS/TOOLSNODRAW",
+                "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_min, y_min, z_max),
                     Vertex(x_min, y_max, z_max),
                     Vertex(x_min, y_max, z_min),
                     Vertex(x_min, y_min, z_min),
                 ],
+                "[0 1 0 0] 0.25",
+                "[0 0 -1 0] 0.25",
             )
         )
 
