@@ -19,6 +19,7 @@ from PySide6.QtGui import QFont
 
 from core.path_generator import PathGenerator
 from vmf.writer import VMFWriter
+from gui.preview_widget import PreviewWidget
 
 
 class MainWindow(QMainWindow):
@@ -128,7 +129,9 @@ class MainWindow(QMainWindow):
 
         grid_layout.addWidget(QLabel("Grid size (snap):"))
         self.grid_size = QComboBox()
-        self.grid_size.addItems(["1", "2", "4", "8", "16", "32", "64", "128", "256", "512"])
+        self.grid_size.addItems(
+            ["1", "2", "4", "8", "16", "32", "64", "128", "256", "512"]
+        )
         self.grid_size.setCurrentText("32")
         grid_layout.addWidget(self.grid_size)
 
@@ -176,7 +179,7 @@ class MainWindow(QMainWindow):
 
     def _create_info_panel(self) -> QWidget:
         """Creates the information panel."""
-        panel = QGroupBox("Information")
+        panel = QGroupBox("Information & Preview")
         layout = QVBoxLayout()
 
         # Log
@@ -186,31 +189,16 @@ class MainWindow(QMainWindow):
 
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(200)
+        self.log_text.setMaximumHeight(120)
         layout.addWidget(self.log_text)
 
-        # Information about block sizes
-        sizes_label = QLabel("Available block sizes:")
-        sizes_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
-        layout.addWidget(sizes_label)
-
-        self.sizes_text = QTextEdit()
-        self.sizes_text.setReadOnly(True)
-        self.sizes_text.setMaximumHeight(150)
-        self.sizes_text.setText(self.generator.get_block_size_info())
-        layout.addWidget(self.sizes_text)
-
-        # Preview (just a placeholder)
-        preview_label = QLabel("Preview:")
+        # 2D Preview widget
+        preview_label = QLabel("2D Preview (Top View):")
         preview_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         layout.addWidget(preview_label)
 
-        self.preview_text = QTextEdit()
-        self.preview_text.setReadOnly(True)
-        self.preview_text.setPlaceholderText(
-            "Here will be displayed information about the generated path..."
-        )
-        layout.addWidget(self.preview_text)
+        self.preview_widget = PreviewWidget()
+        layout.addWidget(self.preview_widget)
 
         panel.setLayout(layout)
         return panel
@@ -223,7 +211,7 @@ class MainWindow(QMainWindow):
         """Handler of the generate button."""
         try:
             self.log("=" * 50)
-            self.log("🚀 Starting generation...")
+            self.log("Starting generation...")
 
             # Get parameters from UI
             start_x = self.start_x.value()
@@ -251,16 +239,16 @@ class MainWindow(QMainWindow):
                     ["small", "medium", "large", "long", "wide"]
                 )
 
-            self.log(f"📍 Start position: ({start_x}, {start_y}, {start_z})")
-            self.log(f"🔢 Number of blocks: {block_count}")
-            self.log(f"📏 Distance: {spacing} units")
-            self.log(f"📐 Grid size: {grid_size} units")
-            self.log(f"🎲 Randomization: {'Yes' if randomize else 'No'}")
+            self.log(f"Start position: ({start_x}, {start_y}, {start_z})")
+            self.log(f"Number of blocks: {block_count}")
+            self.log(f"Distance: {spacing} units")
+            self.log(f"Grid size: {grid_size} units")
+            self.log(f"Randomization: {'Yes' if randomize else 'No'}")
 
             # Generate the path
             solids = self.generator.generate_straight_line()
 
-            self.log(f"✅ Generated {len(solids)} blocks!")
+            self.log(f"Generated {len(solids)} blocks!")
 
             # Clear the writer and add new solids
             self.writer.clear()
@@ -270,18 +258,16 @@ class MainWindow(QMainWindow):
             self.generated = True
             self.save_btn.setEnabled(True)
 
-            # Update the preview
-            preview_info = f"Generated blocks: {len(solids)}\n"
-            preview_info += f"Path length: ~{(block_count - 1) * spacing:.0f} units\n"
-            preview_info += (
-                f"End point: Y = {start_y + (block_count - 1) * spacing:.0f}\n"
+            # Update the 2D preview
+            self.preview_widget.update_preview(
+                solids, (start_x, start_y, start_z), grid_size
             )
-            self.preview_text.setText(preview_info)
 
-            self.log("🎉 Generation completed! You can save the file.")
+            self.log("Generation completed! You can save the file.")
+            self.log(f"Path length: ~{(block_count - 1) * spacing:.0f} units")
 
         except Exception as e:
-            self.log(f"❌ ERROR: {str(e)}")
+            self.log(f"ERROR: {str(e)}")
             QMessageBox.critical(self, "Error", f"Error during generation:\n{str(e)}")
 
     def on_save(self):
@@ -302,7 +288,7 @@ class MainWindow(QMainWindow):
             if filepath:
                 # Save
                 self.writer.save(filepath)
-                self.log(f"💾 File saved: {filepath}")
+                self.log(f"File saved: {filepath}")
                 QMessageBox.information(
                     self,
                     "Success",
@@ -310,5 +296,5 @@ class MainWindow(QMainWindow):
                 )
 
         except Exception as e:
-            self.log(f"❌ ERROR saving: {str(e)}")
+            self.log(f"ERROR saving: {str(e)}")
             QMessageBox.critical(self, "Error", f"Error during saving:\n{str(e)}")
