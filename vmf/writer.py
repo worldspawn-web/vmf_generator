@@ -73,7 +73,7 @@ entity
 {{
 	"id" "2"
 	"classname" "info_player_start"
-	"angles" "0 0 0"
+	"angles" "0 90 0"
 	"origin" "0 0 64"
 	editor
 	{{
