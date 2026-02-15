@@ -60,39 +60,35 @@ class MainWindow(QMainWindow):
         panel = QGroupBox("Generation parameters")
         layout = QVBoxLayout()
 
-        # Start position
+        # Start position (compact: X, Y, Z in one line)
         pos_group = QGroupBox("Start position")
-        pos_layout = QVBoxLayout()
-
-        # X coordinate
-        x_layout = QHBoxLayout()
-        x_layout.addWidget(QLabel("X:"))
+        pos_layout = QHBoxLayout()
+        
+        pos_layout.addWidget(QLabel("X:"))
         self.start_x = QDoubleSpinBox()
         self.start_x.setRange(-10000, 10000)
         self.start_x.setValue(0)
         self.start_x.setDecimals(0)
-        x_layout.addWidget(self.start_x)
-        pos_layout.addLayout(x_layout)
-
-        # Y coordinate
-        y_layout = QHBoxLayout()
-        y_layout.addWidget(QLabel("Y:"))
+        self.start_x.setMaximumWidth(80)
+        pos_layout.addWidget(self.start_x)
+        
+        pos_layout.addWidget(QLabel("Y:"))
         self.start_y = QDoubleSpinBox()
         self.start_y.setRange(-10000, 10000)
         self.start_y.setValue(0)
         self.start_y.setDecimals(0)
-        y_layout.addWidget(self.start_y)
-        pos_layout.addLayout(y_layout)
-
-        # Z coordinate
-        z_layout = QHBoxLayout()
-        z_layout.addWidget(QLabel("Z:"))
+        self.start_y.setMaximumWidth(80)
+        pos_layout.addWidget(self.start_y)
+        
+        pos_layout.addWidget(QLabel("Z:"))
         self.start_z = QDoubleSpinBox()
         self.start_z.setRange(-10000, 10000)
         self.start_z.setValue(0)
         self.start_z.setDecimals(0)
-        z_layout.addWidget(self.start_z)
-        pos_layout.addLayout(z_layout)
+        self.start_z.setMaximumWidth(80)
+        pos_layout.addWidget(self.start_z)
+        
+        pos_layout.addStretch()
 
         pos_group.setLayout(pos_layout)
         layout.addWidget(pos_group)
@@ -112,7 +108,7 @@ class MainWindow(QMainWindow):
 
         # Distance between blocks
         spacing_layout = QHBoxLayout()
-        spacing_layout.addWidget(QLabel("Distance:"))
+        spacing_layout.addWidget(QLabel("Block spacing:"))
         self.spacing = QDoubleSpinBox()
         self.spacing.setRange(50, 1000)
         self.spacing.setValue(150)
@@ -191,8 +187,14 @@ class MainWindow(QMainWindow):
 
         blocks_layout.addWidget(QLabel("Block size:"))
         self.block_type = QComboBox()
-        self.block_type.addItems(["small", "medium", "large", "long", "wide"])
-        self.block_type.setCurrentText("medium")
+        self.block_type.addItems([
+            "small (64x64x32)",
+            "medium (96x96x32)",
+            "large (128x128x32)",
+            "long (128x256x32)",
+            "wide (192x128x32)"
+        ])
+        self.block_type.setCurrentText("medium (96x96x32)")
         blocks_layout.addWidget(self.block_type)
 
         self.randomize_check = QCheckBox("Randomize sizes")
@@ -301,7 +303,9 @@ class MainWindow(QMainWindow):
 
             # If randomization is disabled, use the selected type
             if not randomize:
-                selected_type = self.block_type.currentText()
+                selected_type_text = self.block_type.currentText()
+                # Extract type name from "name (dimensions)" format
+                selected_type = selected_type_text.split(" ")[0]
                 self.generator.set_block_types([selected_type])
             else:
                 # Use all types for randomization
@@ -311,7 +315,7 @@ class MainWindow(QMainWindow):
 
             self.log(f"Start position: ({start_x}, {start_y}, {start_z})")
             self.log(f"Number of blocks: {block_count}")
-            self.log(f"Distance: {spacing} units")
+            self.log(f"Block spacing: {spacing} units")
             self.log(f"Grid size: {grid_size} units")
             self.log(f"Randomization: {'Yes' if randomize else 'No'}")
             self.log(f"Path pattern: {self.path_pattern.currentText()}")
