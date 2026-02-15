@@ -141,17 +141,62 @@ class MainWindow(QMainWindow):
         row_layout.addWidget(self.max_blocks_per_row)
         path_layout.addLayout(row_layout)
 
-        # Path pattern
-        pattern_layout = QVBoxLayout()
-        pattern_layout.addWidget(QLabel("Path pattern:"))
+        # Path mode selector
+        mode_layout = QVBoxLayout()
+        mode_layout.addWidget(QLabel("Path generation mode:"))
+        self.path_mode = QComboBox()
+        self.path_mode.addItems(["Preset Pattern", "Custom Chain"])
+        self.path_mode.setCurrentText("Preset Pattern")
+        self.path_mode.currentTextChanged.connect(self._on_path_mode_changed)
+        mode_layout.addWidget(self.path_mode)
+        path_layout.addLayout(mode_layout)
+
+        # Preset pattern (shown when mode is "Preset Pattern")
+        self.preset_pattern_widget = QWidget()
+        preset_layout = QVBoxLayout()
+        preset_layout.setContentsMargins(0, 0, 0, 0)
+        preset_layout.addWidget(QLabel("Path pattern:"))
         self.path_pattern = QComboBox()
         self.path_pattern.addItems(
             ["Straight", "Right Turn", "Left Turn", "S-Curve", "Zigzag"]
         )
         self.path_pattern.setCurrentText("Straight")
         self.path_pattern.currentTextChanged.connect(lambda: self._update_segment_zones_preview())
-        pattern_layout.addWidget(self.path_pattern)
-        path_layout.addLayout(pattern_layout)
+        preset_layout.addWidget(self.path_pattern)
+        self.preset_pattern_widget.setLayout(preset_layout)
+        path_layout.addWidget(self.preset_pattern_widget)
+
+        # Custom chain builder (shown when mode is "Custom Chain")
+        self.custom_chain_widget = QWidget()
+        custom_layout = QVBoxLayout()
+        custom_layout.setContentsMargins(0, 0, 0, 0)
+        
+        custom_layout.addWidget(QLabel("Segment chain:"))
+        
+        # List of segments
+        self.segment_list = QTextEdit()
+        self.segment_list.setReadOnly(True)
+        self.segment_list.setMaximumHeight(100)
+        self.segment_list.setPlaceholderText("No segments added. Click 'Add Segment' to start.")
+        custom_layout.addWidget(self.segment_list)
+        
+        # Buttons for managing segments
+        segment_btn_layout = QHBoxLayout()
+        self.add_segment_btn = QPushButton("➕ Add Segment")
+        self.add_segment_btn.clicked.connect(self._on_add_segment)
+        segment_btn_layout.addWidget(self.add_segment_btn)
+        
+        self.clear_segments_btn = QPushButton("🗑️ Clear All")
+        self.clear_segments_btn.clicked.connect(self._on_clear_segments)
+        segment_btn_layout.addWidget(self.clear_segments_btn)
+        custom_layout.addLayout(segment_btn_layout)
+        
+        self.custom_chain_widget.setLayout(custom_layout)
+        self.custom_chain_widget.setVisible(False)  # Hidden by default
+        path_layout.addWidget(self.custom_chain_widget)
+        
+        # Store custom segments
+        self.custom_segments = []
 
         # Segment length (for patterns)
         seg_length_layout = QHBoxLayout()
@@ -295,6 +340,102 @@ class MainWindow(QMainWindow):
         # Enable block type selector only when randomize is OFF
         self.block_type.setEnabled(not checked)
 
+    def _on_path_mode_changed(self, mode: str):
+        """Handle path mode change."""
+        if mode == "Preset Pattern":
+            self.preset_pattern_widget.setVisible(True)
+            self.custom_chain_widget.setVisible(False)
+        else:  # Custom Chain
+            self.preset_pattern_widget.setVisible(False)
+            self.custom_chain_widget.setVisible(True)
+        
+        # Update zones preview
+        self._update_segment_zones_preview()
+
+    def _on_add_segment(self):
+        """Add a new segment to the custom chain."""
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox
+        from core.path_types import SegmentDirection
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add Segment")
+        dialog_layout = QVBoxLayout()
+        
+        # Direction
+        dialog_layout.addWidget(QLabel("Direction:"))
+        direction_combo = QComboBox()
+        direction_combo.addItems(["Forward", "Right", "Left", "Back"])
+        dialog_layout.addWidget(direction_combo)
+        
+        # Length
+        length_layout = QHBoxLayout()
+        length_layout.addWidget(QLabel("Length:"))
+        length_spin = QDoubleSpinBox()
+        length_spin.setRange(200, 3000)
+        length_spin.setValue(800)
+        length_spin.setSuffix(" units")
+        length_layout.addWidget(length_spin)
+        dialog_layout.addLayout(length_layout)
+        
+        # Blocks
+        blocks_layout = QHBoxLayout()
+        blocks_layout.addWidget(QLabel("Blocks:"))
+        blocks_spin = QSpinBox()
+        blocks_spin.setRange(1, 50)
+        blocks_spin.setValue(5)
+        blocks_layout.addWidget(blocks_spin)
+        dialog_layout.addLayout(blocks_layout)
+        
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        dialog_layout.addWidget(buttons)
+        
+        dialog.setLayout(dialog_layout)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Map direction string to enum
+            dir_map = {
+                "Forward": SegmentDirection.FORWARD,
+                "Right": SegmentDirection.RIGHT,
+                "Left": SegmentDirection.LEFT,
+                "Back": SegmentDirection.BACK
+            }
+            
+            segment_info = {
+                "direction": dir_map[direction_combo.currentText()],
+                "direction_name": direction_combo.currentText(),
+                "length": length_spin.value(),
+                "blocks": blocks_spin.value()
+            }
+            
+            self.custom_segments.append(segment_info)
+            self._update_segment_list_display()
+            self._update_segment_zones_preview()
+
+    def _on_clear_segments(self):
+        """Clear all custom segments."""
+        self.custom_segments = []
+        self._update_segment_list_display()
+        self._update_segment_zones_preview()
+
+    def _update_segment_list_display(self):
+        """Update the segment list display."""
+        if not self.custom_segments:
+            self.segment_list.setPlainText("No segments added.")
+            return
+        
+        lines = []
+        for i, seg in enumerate(self.custom_segments, 1):
+            lines.append(
+                f"{i}. {seg['direction_name']} - {seg['length']:.0f} units - {seg['blocks']} blocks"
+            )
+        
+        self.segment_list.setPlainText("\n".join(lines))
+
     def _on_show_zones_toggled(self, checked: bool):
         """Handle show zones checkbox toggle."""
         if checked:
@@ -315,24 +456,41 @@ class MainWindow(QMainWindow):
         path_width = self.path_width.value()
         segment_length = self.segment_length.value()
         
-        # Map UI pattern to enum
-        pattern_map = {
-            "Straight": PathPattern.STRAIGHT,
-            "Right Turn": PathPattern.RIGHT_TURN,
-            "Left Turn": PathPattern.LEFT_TURN,
-            "S-Curve": PathPattern.S_CURVE,
-            "Zigzag": PathPattern.ZIGZAG
-        }
-        selected_pattern = pattern_map[self.path_pattern.currentText()]
+        from core.path_types import create_pattern, PathSegment
         
-        # Create segments using the pattern
-        from core.path_types import create_pattern
-        segments = create_pattern(
-            selected_pattern,
-            10,  # dummy block count, not used for zones
-            segment_length,
-            path_width
-        )
+        # Check mode
+        if self.path_mode.currentText() == "Preset Pattern":
+            # Use preset pattern
+            pattern_map = {
+                "Straight": PathPattern.STRAIGHT,
+                "Right Turn": PathPattern.RIGHT_TURN,
+                "Left Turn": PathPattern.LEFT_TURN,
+                "S-Curve": PathPattern.S_CURVE,
+                "Zigzag": PathPattern.ZIGZAG
+            }
+            selected_pattern = pattern_map[self.path_pattern.currentText()]
+            
+            segments = create_pattern(
+                selected_pattern,
+                10,  # dummy block count, not used for zones
+                segment_length,
+                path_width
+            )
+        else:
+            # Use custom chain
+            if not self.custom_segments:
+                self.preview_widget.clear_segment_zones()
+                return
+            
+            segments = []
+            for seg_info in self.custom_segments:
+                segment = PathSegment(
+                    direction=seg_info["direction"],
+                    length=seg_info["length"],
+                    width=path_width,
+                    blocks=seg_info["blocks"]
+                )
+                segments.append(segment)
         
         # Calculate segment positions
         current_pos = (start_x, start_y, start_z)
@@ -388,13 +546,12 @@ class MainWindow(QMainWindow):
             self.generator.set_path_width(path_width)
             self.generator.set_segment_length(segment_length)
             self.generator.set_max_blocks_per_row(max_blocks_per_row)
-            self.generator.set_path_pattern(selected_pattern)
             self.generator.set_rotation_mode(selected_rotation)
             self.generator.set_randomize(randomize)
             self.generator.set_randomize_positions(randomize_positions)
             self.generator.set_grid_size(grid_size)
-
-            # If randomization is disabled, use the selected type
+            
+            # Set block types BEFORE generation
             if not randomize:
                 selected_type_text = self.block_type.currentText()
                 # Extract type name from "name (dimensions)" format
@@ -411,10 +568,35 @@ class MainWindow(QMainWindow):
             self.log(f"Block spacing: {spacing} units")
             self.log(f"Grid size: {grid_size} units")
             self.log(f"Randomization: {'Yes' if randomize else 'No'}")
-            self.log(f"Path pattern: {self.path_pattern.currentText()}")
-
-            # Generate the path using pattern
-            solids = self.generator.generate_with_pattern()
+            
+            # Check which mode to use and generate
+            if self.path_mode.currentText() == "Preset Pattern":
+                # Use preset pattern - clear any custom segments
+                self.generator.segments = []
+                self.generator.set_path_pattern(selected_pattern)
+                self.log(f"Path pattern: {self.path_pattern.currentText()}")
+                solids = self.generator.generate_with_pattern()
+            else:
+                # Use custom chain
+                if not self.custom_segments:
+                    self.log("ERROR: No custom segments defined!")
+                    return
+                
+                from core.path_types import PathSegment
+                segments = []
+                for seg_info in self.custom_segments:
+                    segment = PathSegment(
+                        direction=seg_info["direction"],
+                        length=seg_info["length"],
+                        width=path_width,
+                        blocks=seg_info["blocks"]
+                    )
+                    segments.append(segment)
+                
+                # Set segments in generator
+                self.generator.segments = segments
+                self.log(f"Custom chain: {len(segments)} segments")
+                solids = self.generator.generate_with_pattern()
 
             self.log(f"Generated {len(solids)} blocks!")
 

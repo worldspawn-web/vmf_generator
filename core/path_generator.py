@@ -262,13 +262,14 @@ class PathGenerator:
 
     def generate_with_pattern(self) -> List[Solid]:
         """Generates blocks following a path pattern with corridors."""
-        # Create segments based on pattern
-        self.segments = create_pattern(
-            self.path_pattern,
-            self.block_count,
-            self.segment_length,
-            self.path_width
-        )
+        # If segments are not pre-set (custom chain), create them based on pattern
+        if not self.segments:
+            self.segments = create_pattern(
+                self.path_pattern,
+                self.block_count,
+                self.segment_length,
+                self.path_width
+            )
         
         # Calculate positions for all segments
         current_pos = self.start_pos
