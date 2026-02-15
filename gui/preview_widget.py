@@ -1,6 +1,7 @@
+"""Widget for 2D preview of generated blocks."""
+
 from typing import List, Optional
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
@@ -8,7 +9,7 @@ from vmf.brushes import Solid
 
 
 class PreviewWidget(QWidget):
-    """Widget for displaying 2D preview of blocks (top view)."""
+    """Widget for 2D preview of blocks (top view)."""
 
     def __init__(self):
         super().__init__()
@@ -27,8 +28,10 @@ class PreviewWidget(QWidget):
         self.press_y = 0
         self.hovered_solid: Optional[int] = None
 
-        # Patches for blocks
+        # Artists (for selective redraw)
+        self.grid_lines = []
         self.block_patches = []
+        self.player_marker = None
         self.hover_patch = None
         self.size_texts = []
 
@@ -42,6 +45,7 @@ class PreviewWidget(QWidget):
         self.canvas.mpl_connect("button_release_event", self.on_release)
         self.canvas.mpl_connect("motion_notify_event", self.on_motion)
         self.canvas.mpl_connect("scroll_event", self.on_scroll)
+        self.canvas.mpl_connect("resize_event", self.on_resize)
 
         self._init_plot()
 
@@ -50,15 +54,13 @@ class PreviewWidget(QWidget):
         self.figure.clear()
         self.ax = self.figure.add_subplot(111)
         self.ax.set_facecolor("black")
-        self.ax.set_aspect("equal")
+        # Don't set aspect here - will set in update_preview with adjustable='datalim'
 
         # No labels, no title, no ticks
         self.ax.set_xticks([])
         self.ax.set_yticks([])
-        self.ax.spines["top"].set_visible(False)
-        self.ax.spines["right"].set_visible(False)
-        self.ax.spines["bottom"].set_visible(False)
-        self.ax.spines["left"].set_visible(False)
+        for spine in self.ax.spines.values():
+            spine.set_visible(False)
 
         self.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
@@ -92,19 +94,18 @@ class PreviewWidget(QWidget):
         self.figure.clear()
         self.ax = self.figure.add_subplot(111)
         self.ax.set_facecolor("black")
-        self.ax.set_aspect("equal")
+        # Use aspect='equal' with adjustable='datalim' to fill entire axes
+        self.ax.set_aspect("equal", adjustable="datalim")
 
-        # Clean UI - no labels, ticks, spines
+        # Clean UI
         self.ax.set_xticks([])
         self.ax.set_yticks([])
-        self.ax.spines["top"].set_visible(False)
-        self.ax.spines["right"].set_visible(False)
-        self.ax.spines["bottom"].set_visible(False)
-        self.ax.spines["left"].set_visible(False)
+        for spine in self.ax.spines.values():
+            spine.set_visible(False)
 
         self.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
-        # Borders
+        # Calculate boundaries
         all_x = [s.pos[0] for s in solids] + [s.pos[0] + s.size[0] for s in solids]
         all_y = [s.pos[1] for s in solids] + [s.pos[1] + s.size[1] for s in solids]
         padding = max(200, grid_size * 5)
@@ -114,38 +115,48 @@ class PreviewWidget(QWidget):
         self.ax.set_xlim(x_min, x_max)
         self.ax.set_ylim(y_min, y_max)
 
-        self._draw_grid()
+        # Draw everything
+        self._draw_grid_for_viewport()
         self._draw_blocks()
         self._draw_player()
 
         self.canvas.draw()
 
-    def _draw_grid(self):
-        """Draw grid like in Valve Hammer Editor."""
+    def _draw_grid_for_viewport(self):
+        """Draw grid for current viewport + large margin."""
         x_min, x_max = self.ax.get_xlim()
         y_min, y_max = self.ax.get_ylim()
 
-        # Snap to grid
-        x_min = int(x_min / self.grid_size) * self.grid_size
-        x_max = int(x_max / self.grid_size + 1) * self.grid_size
-        y_min = int(y_min / self.grid_size) * self.grid_size
-        y_max = int(y_max / self.grid_size + 1) * self.grid_size
+        # Add MASSIVE margin to ensure grid covers everything during pan/zoom
+        margin = max(abs(x_max - x_min), abs(y_max - y_min)) * 10
+
+        x_start = int((x_min - margin) / self.grid_size) * self.grid_size
+        x_end = int((x_max + margin) / self.grid_size + 1) * self.grid_size
+        y_start = int((y_min - margin) / self.grid_size) * self.grid_size
+        y_end = int((y_max + margin) / self.grid_size + 1) * self.grid_size
+
+        self.grid_lines = []
 
         # Vertical lines
-        x = x_min
-        while x <= x_max:
-            self.ax.axvline(x, color="#303030", linewidth=0.5, alpha=0.5)
+        x = x_start
+        while x <= x_end:
+            line = self.ax.axvline(
+                x, color="#707070", linewidth=0.5, alpha=0.8, zorder=0
+            )
+            self.grid_lines.append(line)
             x += self.grid_size
 
         # Horizontal lines
-        y = y_min
-        while y <= y_max:
-            self.ax.axhline(y, color="#303030", linewidth=0.5, alpha=0.5)
+        y = y_start
+        while y <= y_end:
+            line = self.ax.axhline(
+                y, color="#707070", linewidth=0.5, alpha=0.8, zorder=0
+            )
+            self.grid_lines.append(line)
             y += self.grid_size
 
     def _draw_blocks(self):
         """Draw blocks."""
-        # Colors for different block sizes
         size_colors = {
             (64, 64, 32): "#FF6B6B",
             (96, 96, 32): "#4ECDC4",
@@ -161,7 +172,14 @@ class PreviewWidget(QWidget):
             color = size_colors.get(solid.size, "#808080")
 
             rect = Rectangle(
-                (x, y), w, l, facecolor=color, edgecolor="white", linewidth=1, alpha=0.6
+                (x, y),
+                w,
+                l,
+                facecolor=color,
+                edgecolor="white",
+                linewidth=1,
+                alpha=0.6,
+                zorder=10,
             )
             self.ax.add_patch(rect)
             self.block_patches.append(rect)
@@ -169,7 +187,7 @@ class PreviewWidget(QWidget):
     def _draw_player(self):
         """Draw start player point."""
         player_x, player_y, _ = self.start_pos
-        self.ax.plot(
+        self.player_marker = self.ax.plot(
             player_x,
             player_y,
             "g^",
@@ -177,7 +195,7 @@ class PreviewWidget(QWidget):
             markeredgecolor="white",
             markeredgewidth=1.5,
             zorder=100,
-        )
+        )[0]
 
     def on_press(self, event):
         """Mouse press handler."""
@@ -193,9 +211,6 @@ class PreviewWidget(QWidget):
 
     def on_motion(self, event):
         """Mouse motion handler."""
-        if event.inaxes != self.ax:
-            return
-
         # Pan
         if self.pressed and event.xdata and event.ydata:
             dx = event.xdata - self.press_x
@@ -207,11 +222,15 @@ class PreviewWidget(QWidget):
             self.ax.set_xlim(x_min - dx, x_max - dx)
             self.ax.set_ylim(y_min - dy, y_max - dy)
 
+            # Only redraw canvas, no grid regeneration
             self.canvas.draw_idle()
             return
 
-        # Hover
+        # Hover detection (only when not dragging)
         if not self.solids or not event.xdata or not event.ydata:
+            if self.hovered_solid is not None:
+                self.hovered_solid = None
+                self._update_hover()
             return
 
         hovered = None
@@ -228,24 +247,52 @@ class PreviewWidget(QWidget):
 
     def on_scroll(self, event):
         """Mouse scroll handler (zoom)."""
-        if event.inaxes != self.ax:
+        if not event.xdata or not event.ydata:
             return
 
-        # Zoom factor
-        scale_factor = 1.2 if event.button == "down" else 1 / 1.2
+        # Zoom factor (smaller for smoother zoom)
+        scale_factor = 1.15 if event.button == "down" else 1 / 1.15
 
         x_min, x_max = self.ax.get_xlim()
         y_min, y_max = self.ax.get_ylim()
 
-        x_center = (x_min + x_max) / 2
-        y_center = (y_min + y_max) / 2
+        # Calculate zoom around mouse position
+        x_data = event.xdata
+        y_data = event.ydata
 
-        x_range = (x_max - x_min) * scale_factor / 2
-        y_range = (y_max - y_min) * scale_factor / 2
+        # New ranges
+        new_width = (x_max - x_min) * scale_factor
+        new_height = (y_max - y_min) * scale_factor
 
-        self.ax.set_xlim(x_center - x_range, x_center + x_range)
-        self.ax.set_ylim(y_center - y_range, y_center + y_range)
+        # Calculate new limits preserving mouse position
+        x_ratio = (x_data - x_min) / (x_max - x_min)
+        y_ratio = (y_data - y_min) / (y_max - y_min)
 
+        new_x_min = x_data - new_width * x_ratio
+        new_x_max = x_data + new_width * (1 - x_ratio)
+        new_y_min = y_data - new_height * y_ratio
+        new_y_max = y_data + new_height * (1 - y_ratio)
+
+        self.ax.set_xlim(new_x_min, new_x_max)
+        self.ax.set_ylim(new_y_min, new_y_max)
+
+        # Only redraw canvas
+        self.canvas.draw_idle()
+
+    def on_resize(self, event):
+        """Handle canvas resize - redraw grid to cover new viewport."""
+        if not self.solids:
+            return
+
+        # Remove old grid lines
+        for line in self.grid_lines:
+            line.remove()
+        self.grid_lines = []
+
+        # Redraw grid for new viewport size
+        self._draw_grid_for_viewport()
+
+        # Redraw canvas
         self.canvas.draw_idle()
 
     def _update_hover(self):
