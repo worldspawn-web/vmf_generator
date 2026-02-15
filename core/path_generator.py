@@ -1,0 +1,82 @@
+import random
+from typing import List
+from vmf.brushes import Solid
+
+
+class PathGenerator:
+    """Generator of straight paths from blocks."""
+
+    # Predefined block sizes (width, length, height)
+    BLOCK_SIZES = {
+        "small": (64, 64, 32),
+        "medium": (96, 96, 32),
+        "large": (128, 128, 32),
+        "long": (128, 256, 32),
+        "wide": (192, 128, 32),
+    }
+
+    def __init__(self):
+        self.start_pos = (0, 0, 0)
+        self.block_count = 10
+        self.spacing = 150  # Distance between blocks on Y
+        self.block_types = ["medium", "large"]  # Which types to use
+        self.randomize_sizes = True
+
+    def set_start_position(self, x: float, y: float, z: float):
+        """Sets the start position."""
+        self.start_pos = (x, y, z)
+
+    def set_block_count(self, count: int):
+        """Sets the number of blocks."""
+        self.block_count = max(1, count)
+
+    def set_spacing(self, spacing: float):
+        """Sets the distance between blocks."""
+        self.spacing = max(50, spacing)
+
+    def set_block_types(self, types: List[str]):
+        """Sets the types of blocks for generation."""
+        valid_types = [t for t in types if t in self.BLOCK_SIZES]
+        if valid_types:
+            self.block_types = valid_types
+
+    def set_randomize(self, randomize: bool):
+        """Enables/disables randomization of sizes."""
+        self.randomize_sizes = randomize
+
+    def generate_straight_line(self) -> List[Solid]:
+        """Generates a straight line from blocks."""
+        solids = []
+        x, y, z = self.start_pos
+
+        for i in range(self.block_count):
+            # Select the block size
+            if self.randomize_sizes:
+                block_type = random.choice(self.block_types)
+            else:
+                block_type = self.block_types[0]
+
+            block_size = self.BLOCK_SIZES[block_type]
+
+            # Center the block on X (to be in the center of the line)
+            block_x = x - block_size[0] / 2
+            block_y = y + (i * self.spacing)
+            block_z = z
+
+            # Create a solid
+            solid = Solid(
+                id=i + 10,  # IDs start with 10
+                pos=(block_x, block_y, block_z),
+                size=block_size,
+            )
+
+            solids.append(solid)
+
+        return solids
+
+    def get_block_size_info(self) -> str:
+        """Returns information about block sizes."""
+        info_lines = []
+        for name, size in self.BLOCK_SIZES.items():
+            info_lines.append(f"{name}: {size[0]}x{size[1]}x{size[2]}")
+        return "\n".join(info_lines)
