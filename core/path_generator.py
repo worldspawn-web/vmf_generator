@@ -21,6 +21,7 @@ class PathGenerator:
         self.spacing = 150  # Distance between blocks on Y
         self.block_types = ["medium", "large"]  # Which types to use
         self.randomize_sizes = True
+        self.grid_size = 32  # Grid size for snapping
 
     def set_start_position(self, x: float, y: float, z: float):
         """Sets the start position."""
@@ -44,6 +45,14 @@ class PathGenerator:
         """Enables/disables randomization of sizes."""
         self.randomize_sizes = randomize
 
+    def set_grid_size(self, grid_size: int):
+        """Sets the grid size for snapping."""
+        self.grid_size = grid_size
+
+    def snap_to_grid(self, value: float) -> float:
+        """Snaps value to the nearest grid point."""
+        return round(value / self.grid_size) * self.grid_size
+
     def generate_straight_line(self) -> List[Solid]:
         """Generates a straight line from blocks."""
         solids = []
@@ -62,6 +71,11 @@ class PathGenerator:
             block_x = x - block_size[0] / 2
             block_y = y + (i * self.spacing)
             block_z = z
+
+            # Snap to grid
+            block_x = self.snap_to_grid(block_x)
+            block_y = self.snap_to_grid(block_y)
+            block_z = self.snap_to_grid(block_z)
 
             # Create a solid
             solid = Solid(

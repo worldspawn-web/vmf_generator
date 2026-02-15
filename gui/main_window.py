@@ -122,6 +122,19 @@ class MainWindow(QMainWindow):
         path_group.setLayout(path_layout)
         layout.addWidget(path_group)
 
+        # Grid settings
+        grid_group = QGroupBox("Grid settings")
+        grid_layout = QVBoxLayout()
+
+        grid_layout.addWidget(QLabel("Grid size (snap):"))
+        self.grid_size = QComboBox()
+        self.grid_size.addItems(["1", "2", "4", "8", "16", "32", "64", "128", "256", "512"])
+        self.grid_size.setCurrentText("32")
+        grid_layout.addWidget(self.grid_size)
+
+        grid_group.setLayout(grid_layout)
+        layout.addWidget(grid_group)
+
         # Types of blocks
         blocks_group = QGroupBox("Block types")
         blocks_layout = QVBoxLayout()
@@ -219,12 +232,14 @@ class MainWindow(QMainWindow):
             block_count = self.block_count.value()
             spacing = self.spacing.value()
             randomize = self.randomize_check.isChecked()
+            grid_size = int(self.grid_size.currentText())
 
             # Configure the generator
             self.generator.set_start_position(start_x, start_y, start_z)
             self.generator.set_block_count(block_count)
             self.generator.set_spacing(spacing)
             self.generator.set_randomize(randomize)
+            self.generator.set_grid_size(grid_size)
 
             # If randomization is disabled, use the selected type
             if not randomize:
@@ -239,6 +254,7 @@ class MainWindow(QMainWindow):
             self.log(f"📍 Start position: ({start_x}, {start_y}, {start_z})")
             self.log(f"🔢 Number of blocks: {block_count}")
             self.log(f"📏 Distance: {spacing} units")
+            self.log(f"📐 Grid size: {grid_size} units")
             self.log(f"🎲 Randomization: {'Yes' if randomize else 'No'}")
 
             # Generate the path
