@@ -1,0 +1,124 @@
+{
+  "shapes": [
+    {
+      "shape_type": "square",
+      "name": "Квадрат",
+      "enabled": true,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "rectangle",
+      "name": "Прямоугольник",
+      "enabled": true,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        2.0
+      ]
+    },
+    {
+      "shape_type": "triangle",
+      "name": "Треугольник",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "circle",
+      "name": "Круг",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "parallelogram",
+      "name": "Параллелограм",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "trapezoid",
+      "name": "Трапеция",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "pentagon",
+      "name": "Пятиугольник",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "rhombus",
+      "name": "Ромб",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "hexagon",
+      "name": "Шестиугольник",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "octagon",
+      "name": "Восьмиугольник",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "shape_type": "oval",
+      "name": "Овал",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.0,
+        1.5
+      ]
+    },
+    {
+      "shape_type": "ellipse",
+      "name": "Эллипс",
+      "enabled": false,
+      "vertices": null,
+      "size_multiplier": [
+        1.5,
+        1.0
+      ]
+    }
+  ]
+}

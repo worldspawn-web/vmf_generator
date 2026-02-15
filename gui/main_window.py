@@ -31,6 +31,10 @@ class MainWindow(QMainWindow):
         self.generator = PathGenerator()
         self.writer = VMFWriter()
         self.generated = False
+        
+        # Initialize shape manager
+        from core.block_shapes import ShapeManager
+        self.shape_manager = ShapeManager()
 
         self.init_ui()
 
@@ -267,6 +271,11 @@ class MainWindow(QMainWindow):
         ])
         self.rotation_mode.setCurrentText("No rotation")
         blocks_layout.addWidget(self.rotation_mode)
+        
+        # Block shapes button
+        self.manage_shapes_btn = QPushButton("🎨 Manage Block Shapes...")
+        self.manage_shapes_btn.clicked.connect(self._on_manage_shapes)
+        blocks_layout.addWidget(self.manage_shapes_btn)
 
         blocks_group.setLayout(blocks_layout)
         layout.addWidget(blocks_group)
@@ -339,6 +348,13 @@ class MainWindow(QMainWindow):
         """Handle randomize checkbox toggle."""
         # Enable block type selector only when randomize is OFF
         self.block_type.setEnabled(not checked)
+
+    def _on_manage_shapes(self):
+        """Open shape manager dialog."""
+        from gui.shape_manager_dialog import ShapeManagerDialog
+        
+        dialog = ShapeManagerDialog(self.shape_manager, self)
+        dialog.exec()
 
     def _on_path_mode_changed(self, mode: str):
         """Handle path mode change."""
@@ -550,6 +566,7 @@ class MainWindow(QMainWindow):
             self.generator.set_randomize(randomize)
             self.generator.set_randomize_positions(randomize_positions)
             self.generator.set_grid_size(grid_size)
+            self.generator.set_shape_manager(self.shape_manager)
             
             # Set block types BEFORE generation
             if not randomize:

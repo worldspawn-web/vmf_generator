@@ -43,6 +43,7 @@ class PathGenerator:
         self.path_pattern = PathPattern.STRAIGHT  # Current pattern
         self.segments: List[PathSegment] = []  # Path segments
         self.rotation_mode = RotationMode.NONE  # Rotation mode
+        self.shape_manager = None  # Shape manager for block forms
 
     def set_start_position(self, x: float, y: float, z: float):
         """Sets the start position."""
@@ -93,6 +94,38 @@ class PathGenerator:
     def set_rotation_mode(self, mode: RotationMode):
         """Sets the rotation mode for blocks."""
         self.rotation_mode = mode
+
+    def set_shape_manager(self, shape_manager):
+        """Sets the shape manager for block forms."""
+        self.shape_manager = shape_manager
+
+    def _get_block_size_from_shapes(self) -> tuple:
+        """
+        Get block size based on enabled shapes (equal probability).
+        
+        Returns:
+            (width, length, height) tuple
+        """
+        if not self.shape_manager:
+            return (96, 96, 32)  # Default medium
+        
+        enabled_shapes = self.shape_manager.get_enabled_shapes()
+        if not enabled_shapes:
+            return (96, 96, 32)
+        
+        # Random choice from enabled shapes (equal probability)
+        shape = random.choice(enabled_shapes)
+        
+        # Base size (can be adjusted)
+        base_width = 96
+        base_length = 96
+        base_height = 32
+        
+        # Apply shape's size multiplier
+        width = int(base_width * shape.size_multiplier[0])
+        length = int(base_length * shape.size_multiplier[1])
+        
+        return (width, length, base_height)
 
     def _get_rotation_angle(self) -> float:
         """
@@ -182,13 +215,16 @@ class PathGenerator:
         blocks_in_current_row = 1  # First row always has 1 block (spawn)
 
         while blocks_generated < self.block_count:
-            # Select the block size
-            if self.randomize_sizes:
-                block_type = random.choice(self.block_types)
+            # Select block size (using shapes if available)
+            if self.shape_manager and self.shape_manager.get_enabled_shapes():
+                block_size = self._get_block_size_from_shapes()
             else:
-                block_type = self.block_types[0]
-
-            block_size = self.BLOCK_SIZES[block_type]
+                # Fallback to old system
+                if self.randomize_sizes:
+                    block_type = random.choice(self.block_types)
+                else:
+                    block_type = self.block_types[0]
+                block_size = self.BLOCK_SIZES[block_type]
 
             # Calculate X position
             if self.randomize_positions and blocks_generated > 0:
@@ -335,13 +371,16 @@ class PathGenerator:
         blocks_in_current_row = 1 if seg_idx == 0 else random.randint(1, self.max_blocks_per_row)
         
         while blocks_generated < blocks_to_generate:
-            # Select block size
-            if self.randomize_sizes:
-                block_type = random.choice(self.block_types)
+            # Select block size (using shapes if available)
+            if self.shape_manager and self.shape_manager.get_enabled_shapes():
+                block_size = self._get_block_size_from_shapes()
             else:
-                block_type = self.block_types[0]
-            
-            block_size = self.BLOCK_SIZES[block_type]
+                # Fallback to old system
+                if self.randomize_sizes:
+                    block_type = random.choice(self.block_types)
+                else:
+                    block_type = self.block_types[0]
+                block_size = self.BLOCK_SIZES[block_type]
             
             # Calculate position
             block_pos = list(current_progress)
