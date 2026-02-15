@@ -120,6 +120,26 @@ class MainWindow(QMainWindow):
         spacing_layout.addWidget(self.spacing)
         path_layout.addLayout(spacing_layout)
 
+        # Path width
+        width_layout = QHBoxLayout()
+        width_layout.addWidget(QLabel("Path width:"))
+        self.path_width = QDoubleSpinBox()
+        self.path_width.setRange(128, 2048)
+        self.path_width.setValue(512)
+        self.path_width.setDecimals(0)
+        self.path_width.setSuffix(" units")
+        width_layout.addWidget(self.path_width)
+        path_layout.addLayout(width_layout)
+
+        # Max blocks per row
+        row_layout = QHBoxLayout()
+        row_layout.addWidget(QLabel("Max blocks per row:"))
+        self.max_blocks_per_row = QSpinBox()
+        self.max_blocks_per_row.setRange(1, 10)
+        self.max_blocks_per_row.setValue(3)
+        row_layout.addWidget(self.max_blocks_per_row)
+        path_layout.addLayout(row_layout)
+
         path_group.setLayout(path_layout)
         layout.addWidget(path_group)
 
@@ -151,6 +171,10 @@ class MainWindow(QMainWindow):
         self.randomize_check = QCheckBox("Randomize sizes")
         self.randomize_check.setChecked(True)
         blocks_layout.addWidget(self.randomize_check)
+
+        self.randomize_positions_check = QCheckBox("Randomize positions (X axis)")
+        self.randomize_positions_check.setChecked(True)
+        blocks_layout.addWidget(self.randomize_positions_check)
 
         blocks_group.setLayout(blocks_layout)
         layout.addWidget(blocks_group)
@@ -219,14 +243,20 @@ class MainWindow(QMainWindow):
             start_z = self.start_z.value()
             block_count = self.block_count.value()
             spacing = self.spacing.value()
+            path_width = self.path_width.value()
+            max_blocks_per_row = self.max_blocks_per_row.value()
             randomize = self.randomize_check.isChecked()
+            randomize_positions = self.randomize_positions_check.isChecked()
             grid_size = int(self.grid_size.currentText())
 
             # Configure the generator
             self.generator.set_start_position(start_x, start_y, start_z)
             self.generator.set_block_count(block_count)
             self.generator.set_spacing(spacing)
+            self.generator.set_path_width(path_width)
+            self.generator.set_max_blocks_per_row(max_blocks_per_row)
             self.generator.set_randomize(randomize)
+            self.generator.set_randomize_positions(randomize_positions)
             self.generator.set_grid_size(grid_size)
 
             # If randomization is disabled, use the selected type

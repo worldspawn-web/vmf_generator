@@ -19,8 +19,11 @@ class PathGenerator:
         self.start_pos = (0, 0, 0)
         self.block_count = 10
         self.spacing = 150  # Distance between blocks on Y
+        self.path_width = 512  # Width of generation zone (X axis)
+        self.max_blocks_per_row = 3  # Max blocks on same Y level
         self.block_types = ["medium", "large"]  # Which types to use
         self.randomize_sizes = True
+        self.randomize_positions = True  # Randomize X positions
         self.grid_size = 32  # Grid size for snapping
 
     def set_start_position(self, x: float, y: float, z: float):
@@ -44,6 +47,18 @@ class PathGenerator:
     def set_randomize(self, randomize: bool):
         """Enables/disables randomization of sizes."""
         self.randomize_sizes = randomize
+
+    def set_path_width(self, width: float):
+        """Sets the width of generation zone."""
+        self.path_width = max(128, width)
+
+    def set_randomize_positions(self, randomize: bool):
+        """Enables/disables randomization of X positions."""
+        self.randomize_positions = randomize
+
+    def set_max_blocks_per_row(self, max_blocks: int):
+        """Sets the maximum number of blocks per row (Y level)."""
+        self.max_blocks_per_row = max(1, min(max_blocks, 10))
 
     def set_grid_size(self, grid_size: int):
         """Sets the grid size for snapping."""
@@ -90,9 +105,12 @@ class PathGenerator:
         solids = []
         x, y, z = self.start_pos
         
-        current_y = y  # Track actual Y position (not just i * spacing)
+        current_y = y  # Track actual Y position
+        blocks_generated = 0
+        current_row_blocks = 0
+        blocks_in_current_row = 1  # First row always has 1 block (spawn)
 
-        for i in range(self.block_count):
+        while blocks_generated < self.block_count:
             # Select the block size
             if self.randomize_sizes:
                 block_type = random.choice(self.block_types)
@@ -101,17 +119,17 @@ class PathGenerator:
 
             block_size = self.BLOCK_SIZES[block_type]
 
-            # Center the block on X (to be in the center of the line)
-            block_x = x - block_size[0] / 2
-            block_z = z
-            
-            # For first block, use start position
-            if i == 0:
-                block_y = current_y
+            # Calculate X position
+            if self.randomize_positions and blocks_generated > 0:
+                # Random position within path_width
+                x_range = (self.path_width - block_size[0]) / 2
+                block_x = x + random.uniform(-x_range, x_range)
             else:
-                # For subsequent blocks, start from previous block's end + spacing
-                prev_solid = solids[-1]
-                block_y = prev_solid.pos[1] + prev_solid.size[1] + self.spacing
+                # Center the block on X (for first block)
+                block_x = x - block_size[0] / 2
+            
+            block_z = z
+            block_y = current_y
 
             # Snap to grid BEFORE collision check
             block_x = self.snap_to_grid(block_x)
@@ -121,26 +139,49 @@ class PathGenerator:
             # Check for collisions and adjust position if needed
             attempts = 0
             max_attempts = 100
-            while self._check_collision(
+            collision = self._check_collision(
                 (block_x, block_y, block_z), block_size, solids
-            ) and attempts < max_attempts:
-                # Move forward by grid_size until no collision
-                block_y += self.grid_size
+            )
+            
+            while collision and attempts < max_attempts:
+                # Try different X position
+                x_range = (self.path_width - block_size[0]) / 2
+                block_x = x + random.uniform(-x_range, x_range)
+                block_x = self.snap_to_grid(block_x)
+                
+                collision = self._check_collision(
+                    (block_x, block_y, block_z), block_size, solids
+                )
                 attempts += 1
             
             if attempts >= max_attempts:
-                print(f"Warning: Could not place block {i} without collision")
-                continue
+                # Can't place block in current row, move to next row
+                current_row_blocks = blocks_in_current_row
+            else:
+                # Successfully placed block
+                solid = Solid(
+                    id=blocks_generated + 10,
+                    pos=(block_x, block_y, block_z),
+                    size=block_size,
+                )
+                solids.append(solid)
+                blocks_generated += 1
+                current_row_blocks += 1
 
-            # Create a solid
-            solid = Solid(
-                id=i + 10,  # IDs start with 10
-                pos=(block_x, block_y, block_z),
-                size=block_size,
-            )
-
-            solids.append(solid)
-            current_y = block_y
+            # Check if we should move to next row
+            if current_row_blocks >= blocks_in_current_row:
+                # Find the tallest block in current row to calculate next Y
+                row_start_idx = len(solids) - current_row_blocks
+                max_length = max(
+                    [s.size[1] for s in solids[row_start_idx:]],
+                    default=0
+                )
+                current_y += max_length + self.spacing
+                
+                # Randomize blocks for next row (1 to max_blocks_per_row)
+                if blocks_generated > 0:
+                    blocks_in_current_row = random.randint(1, self.max_blocks_per_row)
+                current_row_blocks = 0
 
         return solids
 
