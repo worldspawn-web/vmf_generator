@@ -92,8 +92,8 @@ class Solid:
 
         side_id = self.id * 10
 
-        # 6 sides of the cube - all with same texture and proper alignment
-        # Top (players walk on this side) - Z max
+        # 6 sides of the cube - vertices MUST be counter-clockwise from outside!
+        # Top (players walk on this side) - Z max, looking from above
         self.sides.append(
             Side(
                 side_id + 1,
@@ -114,7 +114,7 @@ class Solid:
             )
         )
 
-        # Bottom - Z min
+        # Bottom - Z min, looking from below
         self.sides.append(
             Side(
                 side_id + 2,
@@ -135,86 +135,86 @@ class Solid:
             )
         )
 
-        # North (+Y)
+        # West (-X), looking from outside (west side)
         self.sides.append(
             Side(
                 side_id + 3,
                 [
                     Vertex(x_min, y_max, z_max),
-                    Vertex(x_min, y_max, z_min),
-                    Vertex(x_max, y_max, z_min),
+                    Vertex(x_min, y_min, z_max),
+                    Vertex(x_min, y_min, z_min),
                 ],
                 "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_min, y_max, z_max),
+                    Vertex(x_min, y_min, z_max),
+                    Vertex(x_min, y_min, z_min),
                     Vertex(x_min, y_max, z_min),
-                    Vertex(x_max, y_max, z_min),
-                    Vertex(x_max, y_max, z_max),
                 ],
-                "[1 0 0 0] 0.25",
+                "[0 1 0 0] 0.25",
                 "[0 0 -1 0] 0.25",
             )
         )
 
-        # South (-Y)
+        # East (+X), looking from outside (east side)
         self.sides.append(
             Side(
                 side_id + 4,
                 [
-                    Vertex(x_max, y_min, z_max),
+                    Vertex(x_max, y_max, z_min),
                     Vertex(x_max, y_min, z_min),
-                    Vertex(x_min, y_min, z_min),
+                    Vertex(x_max, y_min, z_max),
                 ],
                 "DEV/DEV_MEASUREGENERIC01B",
                 [
-                    Vertex(x_max, y_min, z_max),
+                    Vertex(x_max, y_max, z_min),
                     Vertex(x_max, y_min, z_min),
-                    Vertex(x_min, y_min, z_min),
-                    Vertex(x_min, y_min, z_max),
+                    Vertex(x_max, y_min, z_max),
+                    Vertex(x_max, y_max, z_max),
                 ],
-                "[1 0 0 0] 0.25",
+                "[0 1 0 0] 0.25",
                 "[0 0 -1 0] 0.25",
             )
         )
 
-        # East (+X)
+        # North (+Y), looking from outside (north side)
         self.sides.append(
             Side(
                 side_id + 5,
                 [
                     Vertex(x_max, y_max, z_max),
-                    Vertex(x_max, y_min, z_max),
-                    Vertex(x_max, y_min, z_min),
+                    Vertex(x_min, y_max, z_max),
+                    Vertex(x_min, y_max, z_min),
                 ],
                 "DEV/DEV_MEASUREGENERIC01B",
                 [
                     Vertex(x_max, y_max, z_max),
-                    Vertex(x_max, y_min, z_max),
-                    Vertex(x_max, y_min, z_min),
+                    Vertex(x_min, y_max, z_max),
+                    Vertex(x_min, y_max, z_min),
                     Vertex(x_max, y_max, z_min),
                 ],
-                "[0 1 0 0] 0.25",
+                "[1 0 0 0] 0.25",
                 "[0 0 -1 0] 0.25",
             )
         )
 
-        # West (-X)
+        # South (-Y), looking from outside (south side)
         self.sides.append(
             Side(
                 side_id + 6,
                 [
+                    Vertex(x_max, y_min, z_min),
+                    Vertex(x_min, y_min, z_min),
                     Vertex(x_min, y_min, z_max),
-                    Vertex(x_min, y_max, z_max),
-                    Vertex(x_min, y_max, z_min),
                 ],
                 "DEV/DEV_MEASUREGENERIC01B",
                 [
-                    Vertex(x_min, y_min, z_max),
-                    Vertex(x_min, y_max, z_max),
-                    Vertex(x_min, y_max, z_min),
+                    Vertex(x_max, y_min, z_min),
                     Vertex(x_min, y_min, z_min),
+                    Vertex(x_min, y_min, z_max),
+                    Vertex(x_max, y_min, z_max),
                 ],
-                "[0 1 0 0] 0.25",
+                "[1 0 0 0] 0.25",
                 "[0 0 -1 0] 0.25",
             )
         )
