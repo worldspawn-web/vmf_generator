@@ -370,14 +370,25 @@ class PreviewWidget(QWidget):
             self.clear_segment_zones()
             return
         
+        # Clear old zone patches
+        for patch in self.zone_patches:
+            if patch in self.ax.patches if self.ax else []:
+                patch.remove()
+        self.zone_patches = []
+        
+        # If we have blocks already, just draw zones on top
+        if self.solids:
+            self._draw_segment_zones()
+            self.canvas.draw_idle()
+            return
+        
+        # If no blocks, show zones in empty preview
         # Initialize plot if needed
         if self.ax is None:
             self._init_plot()
         
-        # Clear old zone patches
-        for patch in self.zone_patches:
-            patch.remove()
-        self.zone_patches = []
+        # Remove placeholder text if exists
+        self.ax.texts = []
         
         # Calculate bounds for all segments
         all_x = []
@@ -388,13 +399,19 @@ class PreviewWidget(QWidget):
             all_x.extend([sx, ex])
             all_y.extend([sy, ey])
         
-        # Set limits with padding
+        # Set limits with padding only if no blocks
         padding = max(200, max(seg.width for seg in segments))
         x_min, x_max = min(all_x) - padding, max(all_x) + padding
         y_min, y_max = min(all_y) - padding, max(all_y) + padding
         
         self.ax.set_xlim(x_min, x_max)
         self.ax.set_ylim(y_min, y_max)
+        
+        # Clear old grid
+        for line in self.grid_lines:
+            if line in self.ax.lines:
+                line.remove()
+        self.grid_lines = []
         
         # Draw grid
         self.grid_size = 32  # default
@@ -456,10 +473,13 @@ class PreviewWidget(QWidget):
     def clear_segment_zones(self):
         """Clear segment zones from preview."""
         for patch in self.zone_patches:
-            if patch in self.ax.patches:
+            if self.ax and patch in self.ax.patches:
                 patch.remove()
         self.zone_patches = []
         self.segment_zones = []
         
-        if self.ax:
+        # If no blocks, restore placeholder
+        if not self.solids and self.ax:
+            self._init_plot()
+        elif self.ax:
             self.canvas.draw_idle()

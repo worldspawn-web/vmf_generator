@@ -407,7 +407,9 @@ class MainWindow(QMainWindow):
             self.generated = True
             self.save_btn.setEnabled(True)
 
-            # Clear segment zones when generating actual blocks
+            # Turn off zone preview when generating actual blocks
+            if self.show_zones_check.isChecked():
+                self.show_zones_check.setChecked(False)
             self.preview_widget.clear_segment_zones()
 
             # Update the 2D preview
