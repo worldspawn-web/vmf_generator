@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont
 
 from core.path_generator import PathGenerator
+from core.path_types import PathPattern
 from vmf.writer import VMFWriter
 from gui.preview_widget import PreviewWidget
 
@@ -140,6 +141,32 @@ class MainWindow(QMainWindow):
         row_layout.addWidget(self.max_blocks_per_row)
         path_layout.addLayout(row_layout)
 
+        # Path pattern
+        pattern_layout = QVBoxLayout()
+        pattern_layout.addWidget(QLabel("Path pattern:"))
+        self.path_pattern = QComboBox()
+        self.path_pattern.addItems([
+            "Straight",
+            "Right Turn",
+            "Left Turn",
+            "S-Curve",
+            "Zigzag"
+        ])
+        self.path_pattern.setCurrentText("Straight")
+        pattern_layout.addWidget(self.path_pattern)
+        path_layout.addLayout(pattern_layout)
+
+        # Segment length (for patterns)
+        seg_length_layout = QHBoxLayout()
+        seg_length_layout.addWidget(QLabel("Segment length:"))
+        self.segment_length = QDoubleSpinBox()
+        self.segment_length.setRange(400, 2000)
+        self.segment_length.setValue(800)
+        self.segment_length.setDecimals(0)
+        self.segment_length.setSuffix(" units")
+        seg_length_layout.addWidget(self.segment_length)
+        path_layout.addLayout(seg_length_layout)
+
         path_group.setLayout(path_layout)
         layout.addWidget(path_group)
 
@@ -245,16 +272,29 @@ class MainWindow(QMainWindow):
             spacing = self.spacing.value()
             path_width = self.path_width.value()
             max_blocks_per_row = self.max_blocks_per_row.value()
+            segment_length = self.segment_length.value()
             randomize = self.randomize_check.isChecked()
             randomize_positions = self.randomize_positions_check.isChecked()
             grid_size = int(self.grid_size.currentText())
+            
+            # Map UI pattern to enum
+            pattern_map = {
+                "Straight": PathPattern.STRAIGHT,
+                "Right Turn": PathPattern.RIGHT_TURN,
+                "Left Turn": PathPattern.LEFT_TURN,
+                "S-Curve": PathPattern.S_CURVE,
+                "Zigzag": PathPattern.ZIGZAG
+            }
+            selected_pattern = pattern_map[self.path_pattern.currentText()]
 
             # Configure the generator
             self.generator.set_start_position(start_x, start_y, start_z)
             self.generator.set_block_count(block_count)
             self.generator.set_spacing(spacing)
             self.generator.set_path_width(path_width)
+            self.generator.set_segment_length(segment_length)
             self.generator.set_max_blocks_per_row(max_blocks_per_row)
+            self.generator.set_path_pattern(selected_pattern)
             self.generator.set_randomize(randomize)
             self.generator.set_randomize_positions(randomize_positions)
             self.generator.set_grid_size(grid_size)
@@ -274,9 +314,10 @@ class MainWindow(QMainWindow):
             self.log(f"Distance: {spacing} units")
             self.log(f"Grid size: {grid_size} units")
             self.log(f"Randomization: {'Yes' if randomize else 'No'}")
+            self.log(f"Path pattern: {self.path_pattern.currentText()}")
 
-            # Generate the path
-            solids = self.generator.generate_straight_line()
+            # Generate the path using pattern
+            solids = self.generator.generate_with_pattern()
 
             self.log(f"Generated {len(solids)} blocks!")
 

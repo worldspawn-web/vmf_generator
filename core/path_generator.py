@@ -1,6 +1,12 @@
 import random
 from typing import List
 from vmf.brushes import Solid
+from core.path_types import (
+    PathPattern,
+    PathSegment,
+    SegmentDirection,
+    create_pattern
+)
 
 
 class PathGenerator:
@@ -20,11 +26,14 @@ class PathGenerator:
         self.block_count = 10
         self.spacing = 150  # Distance between blocks on Y
         self.path_width = 512  # Width of generation zone (X axis)
+        self.segment_length = 800  # Length of each segment
         self.max_blocks_per_row = 3  # Max blocks on same Y level
         self.block_types = ["medium", "large"]  # Which types to use
         self.randomize_sizes = True
         self.randomize_positions = True  # Randomize X positions
         self.grid_size = 32  # Grid size for snapping
+        self.path_pattern = PathPattern.STRAIGHT  # Current pattern
+        self.segments: List[PathSegment] = []  # Path segments
 
     def set_start_position(self, x: float, y: float, z: float):
         """Sets the start position."""
@@ -59,6 +68,14 @@ class PathGenerator:
     def set_max_blocks_per_row(self, max_blocks: int):
         """Sets the maximum number of blocks per row (Y level)."""
         self.max_blocks_per_row = max(1, min(max_blocks, 10))
+
+    def set_segment_length(self, length: float):
+        """Sets the length of path segments."""
+        self.segment_length = max(400, length)
+
+    def set_path_pattern(self, pattern: PathPattern):
+        """Sets the path pattern type."""
+        self.path_pattern = pattern
 
     def set_grid_size(self, grid_size: int):
         """Sets the grid size for snapping."""
@@ -183,6 +200,174 @@ class PathGenerator:
                     blocks_in_current_row = random.randint(1, self.max_blocks_per_row)
                 current_row_blocks = 0
 
+        return solids
+
+    def generate_with_pattern(self) -> List[Solid]:
+        """Generates blocks following a path pattern with corridors."""
+        # Create segments based on pattern
+        self.segments = create_pattern(
+            self.path_pattern,
+            self.block_count,
+            self.segment_length,
+            self.path_width
+        )
+        
+        # Calculate positions for all segments
+        current_pos = self.start_pos
+        for segment in self.segments:
+            segment.start_pos = current_pos
+            segment.calculate_end_pos()
+            current_pos = segment.end_pos
+        
+        solids = []
+        
+        # Generate blocks for each segment
+        for seg_idx, segment in enumerate(self.segments):
+            segment_solids = self._generate_segment_blocks(
+                segment, solids, seg_idx
+            )
+            solids.extend(segment_solids)
+        
+        return solids
+
+    def _generate_segment_blocks(
+        self, segment: PathSegment, existing_solids: List[Solid], seg_idx: int
+    ) -> List[Solid]:
+        """Generate blocks for a single segment."""
+        solids = []
+        blocks_to_generate = segment.blocks
+        blocks_generated = 0
+        
+        # Starting position for this segment
+        sx, sy, sz = segment.start_pos
+        ex, ey, ez = segment.end_pos
+        
+        # Calculate step along segment direction
+        # block_size = (width, length, height) = (X, Y, Z)
+        if segment.direction == SegmentDirection.FORWARD:
+            progress_axis = 1  # Y axis
+            fixed_axis = 0  # X axis (for random positioning)
+            progress_size_idx = 1  # length (Y)
+            fixed_size_idx = 0  # width (X)
+            step_direction = 1
+        elif segment.direction == SegmentDirection.RIGHT:
+            progress_axis = 0  # X axis
+            fixed_axis = 1  # Y axis
+            progress_size_idx = 0  # width (X)
+            fixed_size_idx = 1  # length (Y)
+            step_direction = 1
+        elif segment.direction == SegmentDirection.LEFT:
+            progress_axis = 0  # X axis
+            fixed_axis = 1  # Y axis
+            progress_size_idx = 0  # width (X)
+            fixed_size_idx = 1  # length (Y)
+            step_direction = -1
+        elif segment.direction == SegmentDirection.BACK:
+            progress_axis = 1  # Y axis
+            fixed_axis = 0  # X axis
+            progress_size_idx = 1  # length (Y)
+            fixed_size_idx = 0  # width (X)
+            step_direction = -1
+        else:
+            return solids
+        
+        current_progress = [sx, sy, sz]
+        current_row_blocks = 0
+        blocks_in_current_row = 1 if seg_idx == 0 else random.randint(1, self.max_blocks_per_row)
+        
+        while blocks_generated < blocks_to_generate:
+            # Select block size
+            if self.randomize_sizes:
+                block_type = random.choice(self.block_types)
+            else:
+                block_type = self.block_types[0]
+            
+            block_size = self.BLOCK_SIZES[block_type]
+            
+            # Calculate position
+            block_pos = list(current_progress)
+            
+            # Add randomness to fixed axis within corridor
+            if self.randomize_positions and blocks_generated > 0:
+                half_width = segment.width / 2
+                center = segment.start_pos[fixed_axis]
+                offset_range = (segment.width - block_size[fixed_size_idx]) / 2
+                block_pos[fixed_axis] = center + random.uniform(-offset_range, offset_range)
+            
+            # Snap to grid
+            block_pos[0] = self.snap_to_grid(block_pos[0])
+            block_pos[1] = self.snap_to_grid(block_pos[1])
+            block_pos[2] = self.snap_to_grid(block_pos[2])
+            
+            block_tuple = tuple(block_pos)
+            
+            # Check corridor bounds and collisions
+            if not segment.is_position_in_corridor(block_tuple, block_size):
+                # Out of corridor, move to next row
+                current_row_blocks = blocks_in_current_row
+            else:
+                # Check collision with existing blocks
+                attempts = 0
+                max_attempts = 100
+                all_solids = existing_solids + solids
+                
+                collision = self._check_collision(block_tuple, block_size, all_solids)
+                
+                while collision and attempts < max_attempts:
+                    # Try different position on fixed axis
+                    half_width = segment.width / 2
+                    center = segment.start_pos[fixed_axis]
+                    offset_range = (segment.width - block_size[fixed_size_idx]) / 2
+                    block_pos[fixed_axis] = center + random.uniform(-offset_range, offset_range)
+                    block_pos[fixed_axis] = self.snap_to_grid(block_pos[fixed_axis])
+                    
+                    block_tuple = tuple(block_pos)
+                    
+                    # Recheck corridor and collision
+                    if not segment.is_position_in_corridor(block_tuple, block_size):
+                        break
+                    collision = self._check_collision(block_tuple, block_size, all_solids)
+                    attempts += 1
+                
+                if attempts >= max_attempts or not segment.is_position_in_corridor(block_tuple, block_size):
+                    # Can't place, move to next row
+                    current_row_blocks = blocks_in_current_row
+                else:
+                    # Successfully placed
+                    solid = Solid(
+                        id=len(existing_solids) + len(solids) + 10,
+                        pos=block_tuple,
+                        size=block_size,
+                    )
+                    solids.append(solid)
+                    blocks_generated += 1
+                    current_row_blocks += 1
+            
+            # Check if we should move to next row
+            if current_row_blocks >= blocks_in_current_row:
+                # Find max size in current row along progress axis
+                if solids:
+                    row_start_idx = len(solids) - current_row_blocks
+                    max_size = max(
+                        [s.size[progress_size_idx] for s in solids[row_start_idx:]],
+                        default=0
+                    )
+                    current_progress[progress_axis] += (max_size + self.spacing) * step_direction
+                else:
+                    current_progress[progress_axis] += self.spacing * step_direction
+                
+                # Check if we've gone past segment end
+                if step_direction > 0:
+                    if current_progress[progress_axis] >= segment.end_pos[progress_axis]:
+                        break
+                else:
+                    if current_progress[progress_axis] <= segment.end_pos[progress_axis]:
+                        break
+                
+                # Next row
+                blocks_in_current_row = random.randint(1, self.max_blocks_per_row)
+                current_row_blocks = 0
+        
         return solids
 
     def get_block_size_info(self) -> str:
