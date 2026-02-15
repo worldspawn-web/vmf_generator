@@ -70,22 +70,25 @@ class MainWindow(QMainWindow):
         self.start_x.setValue(0)
         self.start_x.setDecimals(0)
         self.start_x.setMaximumWidth(80)
+        self.start_x.valueChanged.connect(lambda: self._update_segment_zones_preview())
         pos_layout.addWidget(self.start_x)
-
+        
         pos_layout.addWidget(QLabel("Y:"))
         self.start_y = QDoubleSpinBox()
         self.start_y.setRange(-10000, 10000)
         self.start_y.setValue(0)
         self.start_y.setDecimals(0)
         self.start_y.setMaximumWidth(80)
+        self.start_y.valueChanged.connect(lambda: self._update_segment_zones_preview())
         pos_layout.addWidget(self.start_y)
-
+        
         pos_layout.addWidget(QLabel("Z:"))
         self.start_z = QDoubleSpinBox()
         self.start_z.setRange(-10000, 10000)
         self.start_z.setValue(0)
         self.start_z.setDecimals(0)
         self.start_z.setMaximumWidth(80)
+        self.start_z.valueChanged.connect(lambda: self._update_segment_zones_preview())
         pos_layout.addWidget(self.start_z)
 
         pos_layout.addStretch()
@@ -125,6 +128,7 @@ class MainWindow(QMainWindow):
         self.path_width.setValue(512)
         self.path_width.setDecimals(0)
         self.path_width.setSuffix(" units")
+        self.path_width.valueChanged.connect(lambda: self._update_segment_zones_preview())
         width_layout.addWidget(self.path_width)
         path_layout.addLayout(width_layout)
 
@@ -145,6 +149,7 @@ class MainWindow(QMainWindow):
             ["Straight", "Right Turn", "Left Turn", "S-Curve", "Zigzag"]
         )
         self.path_pattern.setCurrentText("Straight")
+        self.path_pattern.currentTextChanged.connect(lambda: self._update_segment_zones_preview())
         pattern_layout.addWidget(self.path_pattern)
         path_layout.addLayout(pattern_layout)
 
@@ -156,6 +161,7 @@ class MainWindow(QMainWindow):
         self.segment_length.setValue(800)
         self.segment_length.setDecimals(0)
         self.segment_length.setSuffix(" units")
+        self.segment_length.valueChanged.connect(lambda: self._update_segment_zones_preview())
         seg_length_layout.addWidget(self.segment_length)
         path_layout.addLayout(seg_length_layout)
 
@@ -209,6 +215,18 @@ class MainWindow(QMainWindow):
 
         blocks_group.setLayout(blocks_layout)
         layout.addWidget(blocks_group)
+
+        # Preview settings
+        preview_group = QGroupBox("Preview settings")
+        preview_layout = QVBoxLayout()
+
+        self.show_zones_check = QCheckBox("Show Segment Zones")
+        self.show_zones_check.setChecked(False)
+        self.show_zones_check.toggled.connect(self._on_show_zones_toggled)
+        preview_layout.addWidget(self.show_zones_check)
+
+        preview_group.setLayout(preview_layout)
+        layout.addWidget(preview_group)
 
         # Action buttons
         buttons_layout = QVBoxLayout()
@@ -266,6 +284,55 @@ class MainWindow(QMainWindow):
         """Handle randomize checkbox toggle."""
         # Enable block type selector only when randomize is OFF
         self.block_type.setEnabled(not checked)
+
+    def _on_show_zones_toggled(self, checked: bool):
+        """Handle show zones checkbox toggle."""
+        if checked:
+            self._update_segment_zones_preview()
+        else:
+            # Clear zones from preview
+            self.preview_widget.clear_segment_zones()
+
+    def _update_segment_zones_preview(self):
+        """Update segment zones preview based on current parameters."""
+        if not self.show_zones_check.isChecked():
+            return
+
+        # Get current parameters
+        start_x = self.start_x.value()
+        start_y = self.start_y.value()
+        start_z = self.start_z.value()
+        path_width = self.path_width.value()
+        segment_length = self.segment_length.value()
+        
+        # Map UI pattern to enum
+        pattern_map = {
+            "Straight": PathPattern.STRAIGHT,
+            "Right Turn": PathPattern.RIGHT_TURN,
+            "Left Turn": PathPattern.LEFT_TURN,
+            "S-Curve": PathPattern.S_CURVE,
+            "Zigzag": PathPattern.ZIGZAG
+        }
+        selected_pattern = pattern_map[self.path_pattern.currentText()]
+        
+        # Create segments using the pattern
+        from core.path_types import create_pattern
+        segments = create_pattern(
+            selected_pattern,
+            10,  # dummy block count, not used for zones
+            segment_length,
+            path_width
+        )
+        
+        # Calculate segment positions
+        current_pos = (start_x, start_y, start_z)
+        for segment in segments:
+            segment.start_pos = current_pos
+            segment.calculate_end_pos()
+            current_pos = segment.end_pos
+        
+        # Update preview with segments
+        self.preview_widget.update_segment_zones(segments)
 
     def on_generate(self):
         """Handler of the generate button."""
@@ -339,6 +406,9 @@ class MainWindow(QMainWindow):
 
             self.generated = True
             self.save_btn.setEnabled(True)
+
+            # Clear segment zones when generating actual blocks
+            self.preview_widget.clear_segment_zones()
 
             # Update the 2D preview
             self.preview_widget.update_preview(

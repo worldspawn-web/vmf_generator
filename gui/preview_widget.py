@@ -6,6 +6,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from vmf.brushes import Solid
+from core.path_types import PathSegment, SegmentDirection
 
 
 class PreviewWidget(QWidget):
@@ -34,6 +35,8 @@ class PreviewWidget(QWidget):
         self.player_marker = None
         self.hover_patch = None
         self.size_texts = []
+        self.segment_zones: List[PathSegment] = []
+        self.zone_patches = []
 
         layout = QVBoxLayout()
         layout.addWidget(self.canvas)
@@ -358,3 +361,105 @@ class PreviewWidget(QWidget):
     def clear_preview(self):
         """Clear preview."""
         self._init_plot()
+
+    def update_segment_zones(self, segments: List[PathSegment]):
+        """Update preview with segment zones."""
+        self.segment_zones = segments
+        
+        if not segments:
+            self.clear_segment_zones()
+            return
+        
+        # Initialize plot if needed
+        if self.ax is None:
+            self._init_plot()
+        
+        # Clear old zone patches
+        for patch in self.zone_patches:
+            patch.remove()
+        self.zone_patches = []
+        
+        # Calculate bounds for all segments
+        all_x = []
+        all_y = []
+        for seg in segments:
+            sx, sy, _ = seg.start_pos
+            ex, ey, _ = seg.end_pos
+            all_x.extend([sx, ex])
+            all_y.extend([sy, ey])
+        
+        # Set limits with padding
+        padding = max(200, max(seg.width for seg in segments))
+        x_min, x_max = min(all_x) - padding, max(all_x) + padding
+        y_min, y_max = min(all_y) - padding, max(all_y) + padding
+        
+        self.ax.set_xlim(x_min, x_max)
+        self.ax.set_ylim(y_min, y_max)
+        
+        # Draw grid
+        self.grid_size = 32  # default
+        self._draw_grid_for_viewport()
+        
+        # Draw segment zones
+        self._draw_segment_zones()
+        
+        self.canvas.draw()
+
+    def _draw_segment_zones(self):
+        """Draw segment zone rectangles."""
+        for seg in self.segment_zones:
+            sx, sy, _ = seg.start_pos
+            ex, ey, _ = seg.end_pos
+            
+            # Calculate rectangle based on direction
+            if seg.direction == SegmentDirection.FORWARD:
+                # Y axis progression
+                rect_x = sx - seg.width / 2
+                rect_y = sy
+                rect_w = seg.width
+                rect_h = ey - sy
+            elif seg.direction == SegmentDirection.RIGHT:
+                # X axis progression (right)
+                rect_x = sx
+                rect_y = sy - seg.width / 2
+                rect_w = ex - sx
+                rect_h = seg.width
+            elif seg.direction == SegmentDirection.LEFT:
+                # X axis progression (left)
+                rect_x = ex
+                rect_y = sy - seg.width / 2
+                rect_w = sx - ex
+                rect_h = seg.width
+            elif seg.direction == SegmentDirection.BACK:
+                # Y axis progression (back)
+                rect_x = sx - seg.width / 2
+                rect_y = ey
+                rect_w = seg.width
+                rect_h = sy - ey
+            else:
+                continue
+            
+            # Draw zone rectangle with yellow/orange color (like hover)
+            zone_rect = Rectangle(
+                (rect_x, rect_y),
+                rect_w,
+                rect_h,
+                linewidth=2,
+                edgecolor="#FFD700",  # Gold
+                facecolor="#FFA500",  # Orange
+                alpha=0.15,
+                zorder=5,
+            )
+            self.ax.add_patch(zone_rect)
+            self.zone_patches.append(zone_rect)
+
+    def clear_segment_zones(self):
+        """Clear segment zones from preview."""
+        for patch in self.zone_patches:
+            if patch in self.ax.patches:
+                patch.remove()
+        self.zone_patches = []
+        self.segment_zones = []
+        
+        if self.ax:
+            self.canvas.draw_idle()
