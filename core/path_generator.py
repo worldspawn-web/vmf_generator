@@ -1,5 +1,6 @@
 import random
 from typing import List
+from enum import Enum
 from vmf.brushes import Solid
 from core.path_types import (
     PathPattern,
@@ -7,6 +8,13 @@ from core.path_types import (
     SegmentDirection,
     create_pattern
 )
+
+
+class RotationMode(Enum):
+    """Rotation modes for blocks."""
+    NONE = "none"  # No rotation (0 degrees)
+    PRIORITY_STRAIGHT = "priority_straight"  # Mostly straight (80% straight, 20% random)
+    FULL_RANDOM = "full_random"  # Completely random angles
 
 
 class PathGenerator:
@@ -34,6 +42,7 @@ class PathGenerator:
         self.grid_size = 32  # Grid size for snapping
         self.path_pattern = PathPattern.STRAIGHT  # Current pattern
         self.segments: List[PathSegment] = []  # Path segments
+        self.rotation_mode = RotationMode.NONE  # Rotation mode
 
     def set_start_position(self, x: float, y: float, z: float):
         """Sets the start position."""
@@ -81,21 +90,50 @@ class PathGenerator:
         """Sets the grid size for snapping."""
         self.grid_size = grid_size
 
+    def set_rotation_mode(self, mode: RotationMode):
+        """Sets the rotation mode for blocks."""
+        self.rotation_mode = mode
+
+    def _get_rotation_angle(self) -> float:
+        """
+        Get rotation angle based on current rotation mode.
+        
+        Returns:
+            Rotation angle in degrees
+        """
+        if self.rotation_mode == RotationMode.NONE:
+            return 0.0
+        elif self.rotation_mode == RotationMode.PRIORITY_STRAIGHT:
+            # 80% chance of 0 degrees, 20% chance of random angle
+            if random.random() < 0.8:
+                return 0.0
+            else:
+                # Random angle from -45 to 45 degrees
+                return random.uniform(-45, 45)
+        elif self.rotation_mode == RotationMode.FULL_RANDOM:
+            # Fully random angle from -45 to 45 degrees
+            return random.uniform(-45, 45)
+        else:
+            return 0.0
+
     def snap_to_grid(self, value: float) -> float:
         """Snaps value to the nearest grid point."""
         return round(value / self.grid_size) * self.grid_size
 
     def _check_collision(
-        self, pos: tuple, size: tuple, existing_solids: List[Solid]
+        self, pos: tuple, size: tuple, existing_solids: List[Solid],
+        rotation_z: float = 0.0
     ) -> bool:
         """
         Check if a block at given position/size collides with existing blocks.
         Uses AABB (Axis-Aligned Bounding Box) collision detection.
+        Takes rotation into account.
         
         Args:
             pos: (x, y, z) position of new block
             size: (width, length, height) size of new block
             existing_solids: list of already placed blocks
+            rotation_z: rotation angle for new block (degrees)
             
         Returns:
             True if collision detected, False otherwise
@@ -103,14 +141,30 @@ class PathGenerator:
         x1, y1, z1 = pos
         w1, l1, h1 = size
         
+        # Calculate AABB for new block (considering rotation)
+        if rotation_z != 0:
+            # Create temporary solid to get rotated bounds
+            temp_solid = Solid(9999, pos, size, rotation_z)
+            min_x1, min_y1, max_x1, max_y1 = temp_solid.get_rotated_bounds()
+        else:
+            min_x1, min_y1 = x1, y1
+            max_x1, max_y1 = x1 + w1, y1 + l1
+        
         for solid in existing_solids:
-            x2, y2, z2 = solid.pos
-            w2, l2, h2 = solid.size
+            # Get AABB for existing block (might also be rotated)
+            if solid.rotation_z != 0:
+                min_x2, min_y2, max_x2, max_y2 = solid.get_rotated_bounds()
+            else:
+                x2, y2, z2 = solid.pos
+                w2, l2, h2 = solid.size
+                min_x2, min_y2 = x2, y2
+                max_x2, max_y2 = x2 + w2, y2 + l2
             
-            # AABB collision check on all 3 axes
-            collision_x = x1 < (x2 + w2) and (x1 + w1) > x2
-            collision_y = y1 < (y2 + l2) and (y1 + l1) > y2
-            collision_z = z1 < (z2 + h2) and (z1 + h1) > z2
+            # AABB collision check on X and Y axes
+            collision_x = min_x1 < max_x2 and max_x1 > min_x2
+            collision_y = min_y1 < max_y2 and max_y1 > min_y2
+            # Z axis - simple check (no rotation on Z affects height)
+            collision_z = z1 < (solid.pos[2] + solid.size[2]) and (z1 + h1) > solid.pos[2]
             
             if collision_x and collision_y and collision_z:
                 return True
@@ -153,11 +207,14 @@ class PathGenerator:
             block_y = self.snap_to_grid(block_y)
             block_z = self.snap_to_grid(block_z)
             
+            # Get rotation angle for this block
+            rotation_angle = self._get_rotation_angle()
+            
             # Check for collisions and adjust position if needed
             attempts = 0
             max_attempts = 100
             collision = self._check_collision(
-                (block_x, block_y, block_z), block_size, solids
+                (block_x, block_y, block_z), block_size, solids, rotation_angle
             )
             
             while collision and attempts < max_attempts:
@@ -167,7 +224,7 @@ class PathGenerator:
                 block_x = self.snap_to_grid(block_x)
                 
                 collision = self._check_collision(
-                    (block_x, block_y, block_z), block_size, solids
+                    (block_x, block_y, block_z), block_size, solids, rotation_angle
                 )
                 attempts += 1
             
@@ -180,6 +237,7 @@ class PathGenerator:
                     id=blocks_generated + 10,
                     pos=(block_x, block_y, block_z),
                     size=block_size,
+                    rotation_z=rotation_angle
                 )
                 solids.append(solid)
                 blocks_generated += 1
@@ -301,6 +359,9 @@ class PathGenerator:
             
             block_tuple = tuple(block_pos)
             
+            # Get rotation angle for this block
+            rotation_angle = self._get_rotation_angle()
+            
             # Check corridor bounds and collisions
             if not segment.is_position_in_corridor(block_tuple, block_size):
                 # Out of corridor, move to next row
@@ -311,7 +372,9 @@ class PathGenerator:
                 max_attempts = 100
                 all_solids = existing_solids + solids
                 
-                collision = self._check_collision(block_tuple, block_size, all_solids)
+                collision = self._check_collision(
+                    block_tuple, block_size, all_solids, rotation_angle
+                )
                 
                 while collision and attempts < max_attempts:
                     # Try different position on fixed axis
@@ -326,7 +389,9 @@ class PathGenerator:
                     # Recheck corridor and collision
                     if not segment.is_position_in_corridor(block_tuple, block_size):
                         break
-                    collision = self._check_collision(block_tuple, block_size, all_solids)
+                    collision = self._check_collision(
+                        block_tuple, block_size, all_solids, rotation_angle
+                    )
                     attempts += 1
                 
                 if attempts >= max_attempts or not segment.is_position_in_corridor(block_tuple, block_size):
@@ -338,6 +403,7 @@ class PathGenerator:
                         id=len(existing_solids) + len(solids) + 10,
                         pos=block_tuple,
                         size=block_size,
+                        rotation_z=rotation_angle
                     )
                     solids.append(solid)
                     blocks_generated += 1

@@ -184,6 +184,18 @@ class PreviewWidget(QWidget):
                 alpha=0.6,
                 zorder=10,
             )
+            
+            # Apply rotation if block is rotated
+            if hasattr(solid, 'rotation_z') and solid.rotation_z != 0:
+                import matplotlib.transforms as transforms
+                # Rotate around block center
+                center_x = x + w / 2
+                center_y = y + l / 2
+                t = transforms.Affine2D().rotate_deg_around(
+                    center_x, center_y, solid.rotation_z
+                ) + self.ax.transData
+                rect.set_transform(t)
+            
             self.ax.add_patch(rect)
             self.block_patches.append(rect)
 

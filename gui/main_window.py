@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QFont
 
-from core.path_generator import PathGenerator
+from core.path_generator import PathGenerator, RotationMode
 from core.path_types import PathPattern
 from vmf.writer import VMFWriter
 from gui.preview_widget import PreviewWidget
@@ -213,6 +213,16 @@ class MainWindow(QMainWindow):
         self.randomize_positions_check.setChecked(True)
         blocks_layout.addWidget(self.randomize_positions_check)
 
+        blocks_layout.addWidget(QLabel("Block rotation:"))
+        self.rotation_mode = QComboBox()
+        self.rotation_mode.addItems([
+            "No rotation",
+            "Priority straight (80% straight)",
+            "Full random rotation"
+        ])
+        self.rotation_mode.setCurrentText("No rotation")
+        blocks_layout.addWidget(self.rotation_mode)
+
         blocks_group.setLayout(blocks_layout)
         layout.addWidget(blocks_group)
 
@@ -352,7 +362,7 @@ class MainWindow(QMainWindow):
             randomize = self.randomize_check.isChecked()
             randomize_positions = self.randomize_positions_check.isChecked()
             grid_size = int(self.grid_size.currentText())
-
+            
             # Map UI pattern to enum
             pattern_map = {
                 "Straight": PathPattern.STRAIGHT,
@@ -362,6 +372,14 @@ class MainWindow(QMainWindow):
                 "Zigzag": PathPattern.ZIGZAG,
             }
             selected_pattern = pattern_map[self.path_pattern.currentText()]
+            
+            # Map UI rotation mode to enum
+            rotation_map = {
+                "No rotation": RotationMode.NONE,
+                "Priority straight (80% straight)": RotationMode.PRIORITY_STRAIGHT,
+                "Full random rotation": RotationMode.FULL_RANDOM
+            }
+            selected_rotation = rotation_map[self.rotation_mode.currentText()]
 
             # Configure the generator
             self.generator.set_start_position(start_x, start_y, start_z)
@@ -371,6 +389,7 @@ class MainWindow(QMainWindow):
             self.generator.set_segment_length(segment_length)
             self.generator.set_max_blocks_per_row(max_blocks_per_row)
             self.generator.set_path_pattern(selected_pattern)
+            self.generator.set_rotation_mode(selected_rotation)
             self.generator.set_randomize(randomize)
             self.generator.set_randomize_positions(randomize_positions)
             self.generator.set_grid_size(grid_size)
