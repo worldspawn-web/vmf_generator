@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
         # Start position (compact: X, Y, Z in one line)
         pos_group = QGroupBox("Start position")
         pos_layout = QHBoxLayout()
-        
+
         pos_layout.addWidget(QLabel("X:"))
         self.start_x = QDoubleSpinBox()
         self.start_x.setRange(-10000, 10000)
@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         self.start_x.setDecimals(0)
         self.start_x.setMaximumWidth(80)
         pos_layout.addWidget(self.start_x)
-        
+
         pos_layout.addWidget(QLabel("Y:"))
         self.start_y = QDoubleSpinBox()
         self.start_y.setRange(-10000, 10000)
@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         self.start_y.setDecimals(0)
         self.start_y.setMaximumWidth(80)
         pos_layout.addWidget(self.start_y)
-        
+
         pos_layout.addWidget(QLabel("Z:"))
         self.start_z = QDoubleSpinBox()
         self.start_z.setRange(-10000, 10000)
@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
         self.start_z.setDecimals(0)
         self.start_z.setMaximumWidth(80)
         pos_layout.addWidget(self.start_z)
-        
+
         pos_layout.addStretch()
 
         pos_group.setLayout(pos_layout)
@@ -141,13 +141,9 @@ class MainWindow(QMainWindow):
         pattern_layout = QVBoxLayout()
         pattern_layout.addWidget(QLabel("Path pattern:"))
         self.path_pattern = QComboBox()
-        self.path_pattern.addItems([
-            "Straight",
-            "Right Turn",
-            "Left Turn",
-            "S-Curve",
-            "Zigzag"
-        ])
+        self.path_pattern.addItems(
+            ["Straight", "Right Turn", "Left Turn", "S-Curve", "Zigzag"]
+        )
         self.path_pattern.setCurrentText("Straight")
         pattern_layout.addWidget(self.path_pattern)
         path_layout.addLayout(pattern_layout)
@@ -185,21 +181,27 @@ class MainWindow(QMainWindow):
         blocks_group = QGroupBox("Block types")
         blocks_layout = QVBoxLayout()
 
-        blocks_layout.addWidget(QLabel("Block size:"))
-        self.block_type = QComboBox()
-        self.block_type.addItems([
-            "small (64x64x32)",
-            "medium (96x96x32)",
-            "large (128x128x32)",
-            "long (128x256x32)",
-            "wide (192x128x32)"
-        ])
-        self.block_type.setCurrentText("medium (96x96x32)")
-        blocks_layout.addWidget(self.block_type)
-
-        self.randomize_check = QCheckBox("Randomize sizes")
+        self.randomize_check = QCheckBox("Randomize sizes (use all types)")
         self.randomize_check.setChecked(True)
         blocks_layout.addWidget(self.randomize_check)
+
+        blocks_layout.addWidget(QLabel("Fixed block size:"))
+        self.block_type = QComboBox()
+        self.block_type.addItems(
+            [
+                "small (64x64x32)",
+                "medium (96x96x32)",
+                "large (128x128x32)",
+                "long (128x256x32)",
+                "wide (192x128x32)",
+            ]
+        )
+        self.block_type.setCurrentText("medium (96x96x32)")
+        self.block_type.setEnabled(False)  # Disabled by default since randomize is ON
+        blocks_layout.addWidget(self.block_type)
+
+        # Connect randomize checkbox to enable/disable block type selector
+        self.randomize_check.toggled.connect(self._on_randomize_toggled)
 
         self.randomize_positions_check = QCheckBox("Randomize positions (X axis)")
         self.randomize_positions_check.setChecked(True)
@@ -260,6 +262,11 @@ class MainWindow(QMainWindow):
         """Adds a message to the log."""
         self.log_text.append(message)
 
+    def _on_randomize_toggled(self, checked: bool):
+        """Handle randomize checkbox toggle."""
+        # Enable block type selector only when randomize is OFF
+        self.block_type.setEnabled(not checked)
+
     def on_generate(self):
         """Handler of the generate button."""
         try:
@@ -278,14 +285,14 @@ class MainWindow(QMainWindow):
             randomize = self.randomize_check.isChecked()
             randomize_positions = self.randomize_positions_check.isChecked()
             grid_size = int(self.grid_size.currentText())
-            
+
             # Map UI pattern to enum
             pattern_map = {
                 "Straight": PathPattern.STRAIGHT,
                 "Right Turn": PathPattern.RIGHT_TURN,
                 "Left Turn": PathPattern.LEFT_TURN,
                 "S-Curve": PathPattern.S_CURVE,
-                "Zigzag": PathPattern.ZIGZAG
+                "Zigzag": PathPattern.ZIGZAG,
             }
             selected_pattern = pattern_map[self.path_pattern.currentText()]
 
